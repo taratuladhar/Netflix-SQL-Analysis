@@ -257,3 +257,131 @@ FROM (
     GROUP BY g.genre, n.director
 ) ranked
 WHERE rnk <= 3;
+
+
+-- ==== DATA QUALITY CHECKS ====
+-- Check 1: Missing Values Across All Fields
+SELECT
+    COUNT(*) AS total_records,
+    COUNT(*) FILTER (
+        WHERE show_id IS NULL OR TRIM(show_id) = ''
+    ) AS missing_ids,
+    COUNT(*) FILTER (
+        WHERE type IS NULL OR TRIM(type) = ''
+    ) AS missing_types,
+    COUNT(*) FILTER (
+        WHERE title IS NULL OR TRIM(title) = ''
+    ) AS missing_titles,
+    COUNT(*) FILTER (
+        WHERE director IS NULL OR TRIM(director) = ''
+    ) AS missing_directors,
+    COUNT(*) FILTER (
+        WHERE cast_members IS NULL OR TRIM(cast_members) = ''
+    ) AS missing_cast,
+    COUNT(*) FILTER (
+        WHERE country IS NULL OR TRIM(country) = ''
+    ) AS missing_countries,
+    COUNT(*) FILTER (
+        WHERE date_added IS NULL
+    ) AS missing_dates,
+    COUNT(*) FILTER (
+        WHERE release_year IS NULL
+    ) AS missing_release_years,
+    COUNT(*) FILTER (
+        WHERE rating IS NULL OR TRIM(rating) = ''
+    ) AS missing_ratings,
+    COUNT(*) FILTER (
+        WHERE duration IS NULL OR TRIM(duration) = ''
+    ) AS missing_durations,
+    COUNT(*) FILTER (
+        WHERE listed_in IS NULL OR TRIM(listed_in) = ''
+    ) AS missing_genres,
+    COUNT(*) FILTER (
+        WHERE description IS NULL OR TRIM(description) = ''
+    ) AS missing_descriptions
+FROM netflix_titles;
+
+-- Checking data column names and their data types
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'netflix_titles'
+ORDER BY ordinal_position;
+
+-- Check 2: Identify invalid values
+SELECT *
+FROM netflix_titles
+WHERE (
+    type IS NOT NULL
+    AND TRIM(type) <> ''
+    AND TRIM(type) NOT IN ('Movie', 'TV Show')
+)
+OR (
+    release_year IS NOT NULL
+    AND (
+        release_year < 1888
+        OR release_year > EXTRACT(YEAR FROM CURRENT_DATE)::INT
+    )
+);
+
+-- ==== DUPLICATE RECORDS ====
+-- Check 1: Duplicate show IDs
+SELECT
+    show_id,
+    COUNT(*) AS record_count
+FROM netflix_titles
+WHERE show_id IS NOT NULL
+GROUP BY show_id
+HAVING COUNT(*) > 1
+ORDER BY record_count DESC;
+
+
+-- Check 2: Finding duplicate titles
+SELECT
+    LOWER(TRIM(title)) AS normalized_title,
+    type,
+    release_year,
+    COUNT(*) AS record_count
+FROM netflix_titles
+WHERE title IS NOT NULL
+  AND TRIM(title) <> ''
+GROUP BY
+    LOWER(TRIM(title)),
+    type,
+    release_year
+HAVING COUNT(*) > 1
+ORDER BY record_count DESC;
+
+-- ==== CTE based analysis ====
+-- Business question:
+-- How many titles were added to Netflix each year,
+-- and how did the total change compared with the previous year?
+
+WITH yearly_additions AS (
+    SELECT
+        EXTRACT(YEAR FROM date_added)::INT AS year_added,
+        COUNT(*) AS titles_added
+    FROM netflix_titles
+    WHERE date_added IS NOT NULL
+    GROUP BY EXTRACT(YEAR FROM date_added)
+),
+yearly_growth AS (
+    SELECT
+        year_added,
+        titles_added,
+        LAG(titles_added) OVER (
+            ORDER BY year_added
+        ) AS previous_year_titles
+    FROM yearly_additions
+)
+SELECT
+    year_added,
+    titles_added,
+    previous_year_titles,
+    titles_added - previous_year_titles AS net_change,
+    ROUND(
+        100.0 * (titles_added - previous_year_titles)
+        / NULLIF(previous_year_titles, 0),
+        2
+    ) AS growth_percentage
+FROM yearly_growth
+ORDER BY year_added;
