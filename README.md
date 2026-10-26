@@ -22,8 +22,24 @@ This repository contains SQL queries and analysis performed on the Netflix Shows
 
 **Note:** The dataset is sourced directly from Kaggle. Columns may contain NULL values for some titles.
 
+## SQL Concepts Demonstrated
+
+- Filtering, sorting, and aggregation
+- GROUP BY and HAVING
+- String functions and NULL handling
+- Common Table Expressions (CTEs)
+- Window functions such as LAG() and RANK()
+- Date functions and percentage calculations
+- Data-quality validation and duplicate detection
+
 ## How to Use
 
 1. Import `netflix_titles.csv` into your preferred SQL database (PostgreSQL recommended).  
 2. Execute the `.sql` file in order, or run queries individually to explore different aspects of the dataset.  
 3. The file contains queries with comments explaining the purpose and expected output.
+
+## Learning Outcomes
+
+This project demonstrates practical SQL skills in exploratory analysis, data validation, duplicate detection, analytical querying, and technical documentation.
+
+
